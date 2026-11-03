@@ -1,0 +1,47 @@
+name: Світло-бот
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # кожні 15 хвилин
+  workflow_dispatch:          # кнопка «Run workflow» для ручного запуску
+
+permissions:
+  contents: write             # щоб бот міг зберігати свою пам'ять (state.json)
+
+concurrency:
+  group: svitlo-bot
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Встановлення браузера
+        run: |
+          pip install playwright==1.49.1
+          python -m playwright install --with-deps chromium
+
+      - name: Перевірка графіка
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          DTEK_CITY: ${{ secrets.DTEK_CITY }}
+          DTEK_STREET: ${{ secrets.DTEK_STREET }}
+          DTEK_HOUSE: ${{ secrets.DTEK_HOUSE }}
+          DTEK_GROUP: ${{ secrets.DTEK_GROUP }}
+        run: python bot.py
+
+      - name: Збереження памʼяті бота
+        if: always()
+        run: |
+          git config user.name "svitlo-bot"
+          git config user.email "svitlo-bot@users.noreply.github.com"
+          if [ -f state.json ]; then git add state.json; fi
+          git diff --cached --quiet || (git commit -m "Оновлення стану" && git push)
